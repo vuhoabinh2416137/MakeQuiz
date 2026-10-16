@@ -937,30 +937,46 @@
     const rating = flashcardRatings[qKey] || 'unrated';
     const isStarred = starredQuestions.has(qKey);
 
+    // Calculate Chapter Mastery
+    let easyCount = 0;
+    let goodCount = 0;
+    let hardCount = 0;
+    flashcardDeck.forEach((cardQ) => {
+      const k = `ch_${currentChapterId}_q_${cardQ.num}`;
+      const r = flashcardRatings[k];
+      if (r === 'easy') easyCount++;
+      else if (r === 'good') goodCount++;
+      else if (r === 'hard') hardCount++;
+    });
+    const unratedCount = flashcardDeck.length - (easyCount + goodCount + hardCount);
+
     // Front Content Generation
     let frontBodyHtml = '';
     if (q.part === 1) {
       // MCQ Front: prompt + options
       let optList = q.options.map((o) => `
-        <div style="padding: 8px 12px; background: var(--bg-secondary); border-radius: 6px; margin-bottom: 6px; font-size: 0.92rem; display: flex; gap: 8px;">
-          <strong style="color: var(--accent-primary);">${o.key}.</strong>
-          <span>${formatMarkdown(o.text)}</span>
+        <div class="fc-option-item">
+          <div class="fc-option-letter">${o.key}</div>
+          <div class="fc-option-text">${formatMarkdown(o.text)}</div>
         </div>
       `).join('');
       frontBodyHtml = `
         <div class="fc-prompt-text">${formatMarkdown(q.stem)}</div>
-        <div style="margin-top: 16px;">${optList}</div>
+        <div class="fc-options-list">${optList}</div>
       `;
     } else if (q.part === 2) {
       // True/False Front: context + 4 statements
       let stmtList = q.items.map((it) => `
-        <div style="padding: 8px 12px; background: var(--bg-secondary); border-radius: 6px; margin-bottom: 6px; font-size: 0.92rem;">
-          <strong style="color: var(--accent-secondary);">${it.key.toUpperCase()})</strong> ${formatMarkdown(it.text)}
+        <div class="fc-option-item">
+          <div class="fc-option-letter" style="color: var(--accent-secondary);">${it.key.toUpperCase()}</div>
+          <div class="fc-option-text">${formatMarkdown(it.text)}</div>
         </div>
       `).join('');
       frontBodyHtml = `
-        <div style="font-size: 0.92rem; color: var(--text-secondary); margin-bottom: 10px;"><strong>Ngữ cảnh:</strong> ${formatMarkdown(q.context)}</div>
-        <div>${stmtList}</div>
+        <div style="font-size: 0.95rem; line-height: 1.5; color: var(--text-secondary); margin-bottom: 14px; padding: 10px 14px; background: var(--bg-secondary); border-radius: 8px; border-left: 3px solid var(--accent-secondary);">
+          <strong>Ngữ cảnh câu hỏi:</strong> ${formatMarkdown(q.context)}
+        </div>
+        <div class="fc-options-list">${stmtList}</div>
       `;
     } else if (q.part === 3) {
       // Short Answer Front
@@ -978,36 +994,42 @@
         <div class="fc-answer-badge">
           <span>✓ Đáp án đúng:</span> <strong>${q.correctAnswer}</strong>
         </div>
-        ${correctOpt ? `<div style="font-size: 1.05rem; font-weight: 600; margin-bottom: 16px; color: var(--text-primary);">${formatMarkdown(correctOpt.text)}</div>` : ''}
+        ${correctOpt ? `<div style="font-size: 1.1rem; font-weight: 700; margin-bottom: 16px; color: var(--text-primary); line-height: 1.5;">${formatMarkdown(correctOpt.text)}</div>` : ''}
         ${q.citation ? `<div class="citation-box"><strong>📖 Căn cứ tài liệu:</strong> ${formatMarkdown(q.citation)}</div>` : ''}
         ${q.trap ? `<div class="trap-box"><strong>💡 Phân tích bẫy tư duy:</strong> ${formatMarkdown(q.trap)}</div>` : ''}
-        <div style="font-size: 0.9rem; line-height: 1.6; color: var(--text-secondary); margin-top: 10px;">
-          ${formatMarkdown(q.explanation)}
+        <div style="font-size: 0.92rem; line-height: 1.6; color: var(--text-secondary); margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border-subtle);">
+          <strong style="color: var(--text-primary);">📝 Lời giải chi tiết:</strong>
+          <div style="margin-top: 4px;">${formatMarkdown(q.explanation)}</div>
         </div>
       `;
     } else if (q.part === 2) {
       let backStmtList = q.items.map((it) => `
-        <div style="padding: 8px 12px; background: var(--bg-secondary); border-radius: 6px; margin-bottom: 8px; font-size: 0.9rem;">
-          <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
-            <strong style="color: var(--accent-secondary);">${it.key.toUpperCase()})</strong>
-            <span style="font-weight: 800; color: ${it.correctAnswer ? 'var(--correct)' : 'var(--incorrect)'};">${it.correctAnswer ? '✓ ĐÚNG' : '✗ SAI'}</span>
+        <div class="fc-option-item" style="flex-direction: column; gap: 8px;">
+          <div style="display: flex; align-items: flex-start; justify-content: space-between; width: 100%; gap: 12px;">
+            <div style="display: flex; align-items: flex-start; gap: 10px; flex: 1;">
+              <span class="fc-option-letter" style="color: var(--accent-secondary);">${it.key.toUpperCase()}</span>
+              <span style="font-weight: 600; font-size: 0.95rem; line-height: 1.45;">${formatMarkdown(it.text)}</span>
+            </div>
+            <span style="padding: 4px 12px; border-radius: 6px; font-weight: 800; font-size: 0.85rem; flex-shrink: 0; background: ${it.correctAnswer ? 'var(--correct-bg)' : 'var(--incorrect-bg)'}; color: ${it.correctAnswer ? 'var(--correct)' : 'var(--incorrect)'}; border: 1px solid ${it.correctAnswer ? 'var(--correct-border)' : 'var(--incorrect-border)'};">
+              ${it.correctAnswer ? '✓ ĐÚNG' : '✗ SAI'}
+            </span>
           </div>
-          <div style="color: var(--text-secondary); font-size: 0.85rem;">${it.explanation ? formatMarkdown(it.explanation) : ''}</div>
+          ${it.explanation ? `<div style="color: var(--text-secondary); font-size: 0.88rem; padding-left: 36px; line-height: 1.4;">${formatMarkdown(it.explanation)}</div>` : ''}
         </div>
       `).join('');
-      backBodyHtml = `<div>${backStmtList}</div>`;
+      backBodyHtml = `<div class="fc-options-list">${backStmtList}</div>`;
     } else if (q.part === 3) {
       backBodyHtml = `
         <div class="fc-answer-badge">
-          <span>✓ Đáp án:</span> <strong>${escapeHtml(q.canonicalAnswer || (q.acceptedAnswers && q.acceptedAnswers[0]) || '')}</strong>
+          <span>✓ Đáp án chuẩn:</span> <strong>${escapeHtml(q.canonicalAnswer || (q.acceptedAnswers && q.acceptedAnswers[0]) || '')}</strong>
         </div>
         ${q.acceptedAnswers && q.acceptedAnswers.length > 1 ? `
-          <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 12px;">
+          <div style="font-size: 0.88rem; color: var(--text-secondary); margin-bottom: 14px;">
             <em>Các biến thể được chấp nhận:</em> ${q.acceptedAnswers.map((a) => `<code>${escapeHtml(a)}</code>`).join(', ')}
           </div>
         ` : ''}
         <div class="citation-box" style="margin-top: 12px;">
-          <strong>📝 Căn cứ & Lời giải:</strong> ${formatMarkdown(q.explanation)}
+          <strong>📖 Căn cứ & Lời giải:</strong> ${formatMarkdown(q.explanation)}
         </div>
       `;
     }
@@ -1042,7 +1064,7 @@
           <div class="flashcard-face flashcard-front">
             <div class="fc-card-top">
               <span class="question-index-badge">Câu ${q.num}</span>
-              <span style="font-size: 0.8rem; color: var(--text-muted);">Mặt trước (Câu hỏi)</span>
+              <span style="font-size: 0.82rem; color: var(--text-muted);">Mặt trước (Câu hỏi)</span>
             </div>
             <div class="fc-card-body">
               ${frontBodyHtml}
@@ -1056,7 +1078,7 @@
           <div class="flashcard-face flashcard-back">
             <div class="fc-card-top">
               <span class="question-index-badge" style="background: rgba(16, 185, 129, 0.2); color: var(--correct);">Câu ${q.num} - Đáp án</span>
-              <span style="font-size: 0.8rem; color: var(--text-muted);">Mặt sau (Giải thích chi tiết)</span>
+              <span style="font-size: 0.82rem; color: var(--text-muted);">Mặt sau (Giải thích chi tiết)</span>
             </div>
             <div class="fc-card-body">
               ${backBodyHtml}
@@ -1098,6 +1120,22 @@
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
             </svg>
           </button>
+        </div>
+
+        <!-- Mastery Summary Strip -->
+        <div class="fc-mastery-strip">
+          <div class="fc-mastery-item" style="color: var(--correct);">
+            <span>🟢</span> Đã thuộc: <strong>${easyCount}</strong>
+          </div>
+          <div class="fc-mastery-item" style="color: var(--warning);">
+            <span>🟡</span> Tạm nhớ: <strong>${goodCount}</strong>
+          </div>
+          <div class="fc-mastery-item" style="color: var(--incorrect);">
+            <span>🔴</span> Cần ôn: <strong>${hardCount}</strong>
+          </div>
+          <div class="fc-mastery-item" style="color: var(--text-muted);">
+            <span>⚪</span> Chưa học: <strong>${unratedCount}</strong>
+          </div>
         </div>
       </div>
     `;
