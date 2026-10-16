@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="vi" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MakeQuiz - Nền Tảng Khảo Thí & Học Tập Chủ Động (Active Recall)</title>
+  <meta name="description" content="Hệ thống luyện tập kiến thức chuyên sâu với 465 câu hỏi, kiểm tra tức thì, giải thích cặn kẽ và trích dẫn giáo trình gốc.">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Sidebar Navigation: Chapters -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <div class="brand">
+          <div class="brand-icon">⚡</div>
+          <div class="brand-text">
+            <h1>MakeQuiz</h1>
+            <p>Adaptive Learning Engine</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="sidebar-search-box">
+        <div class="search-input-wrapper">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+          </svg>
+          <input type="text" id="chapterSearchInput" class="sidebar-search-input" placeholder="Tìm chương hoặc chủ đề...">
+        </div>
+      </div>
+
+      <div class="chapter-list" id="chapterList">
+        <!-- Rendered dynamically by app.js -->
+      </div>
+
+      <div class="sidebar-footer">
+        <div class="overall-stats" id="overallStats">
+          Tiến độ: <strong id="overallProgressText">0/465</strong> (<span id="overallPercentText">0%</span>)
+        </div>
+        <button class="header-btn" id="resetAllBtn" title="Đặt lại toàn bộ tiến độ">
+          <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+          </svg>
+        </button>
+      </div>
+    </aside>
+
+    <!-- Main Content Wrapper -->
+    <div class="main-wrapper">
+      <!-- Top Application Header -->
+      <header class="app-header">
+        <div class="header-left">
+          <button class="sidebar-toggle-btn" id="sidebarToggleBtn" aria-label="Mở danh mục chương">
+            <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+            </svg>
+          </button>
+          <div class="active-chapter-indicator">
+            <span class="badge" id="activeChapterBadge">Chương 1</span>
+            <span class="title" id="activeChapterTitle">Spring trong thế giới thực</span>
+          </div>
+        </div>
+
+        <div class="header-right">
+          <!-- Chapter Stats Badges -->
+          <div class="stat-chip correct-chip" title="Số câu đúng trong chương">
+            <span>✓</span> <span id="chapterCorrectCount">0</span>
+          </div>
+          <div class="stat-chip incorrect-chip" title="Số câu sai trong chương">
+            <span>✗</span> <span id="chapterIncorrectCount">0</span>
+          </div>
+          <div class="stat-chip progress-chip" title="Tiến độ hoàn thành chương">
+            <span id="chapterProgressRatio">0/31</span>
+          </div>
+
+          <!-- Quick Action Buttons -->
+          <button class="header-btn" id="soundToggleBtn" title="Bật/Tắt âm thanh hiệu ứng">
+            <span id="soundIcon">🔊</span>
+          </button>
+          <button class="header-btn" id="themeToggleBtn" title="Chuyển chế độ Sáng / Tối">
+            <span id="themeIcon">🌙</span>
+          </button>
+        </div>
+      </header>
+
+      <!-- View Mode Tabs (Practice vs Flashcard) -->
+      <div style="padding: 16px 32px 0; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
+        <div class="view-mode-tabs">
+          <button class="view-mode-tab active" id="tabPracticeMode">
+            <span>📝</span> Luyện tập câu hỏi
+          </button>
+          <button class="view-mode-tab" id="tabFlashcardMode">
+            <span>🎴</span> Thẻ Flashcard
+          </button>
+        </div>
+      </div>
+
+      <!-- Filter Toolbar (Practice Mode) -->
+      <div class="toolbar-container" id="practiceToolbar">
+        <!-- Part Filter Group -->
+        <div class="filter-group">
+          <button class="filter-btn active" data-part="all">Tất cả <span class="badge-count" id="countAll">31</span></button>
+          <button class="filter-btn" data-part="1">Phần I: Trắc nghiệm (20)</button>
+          <button class="filter-btn" data-part="2">Phần II: Đúng/Sai (5)</button>
+          <button class="filter-btn" data-part="3">Phần III: Điền từ (6)</button>
+        </div>
+
+        <!-- Secondary Filter & Action Group -->
+        <div class="filter-group">
+          <button class="filter-btn" data-filter="starred" id="filterStarredBtn">⭐ Đã lưu (<span id="starredCount">0</span>)</button>
+          <button class="filter-btn" data-filter="incorrect" id="filterIncorrectBtn">❌ Làm lại câu sai</button>
+          <button class="action-link-btn" id="resetCurrentChapterBtn" title="Làm lại chương này">
+            <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+            </svg>
+            Làm lại chương
+          </button>
+        </div>
+      </div>
+
+      <!-- Question Cards List Container (Practice Mode) -->
+      <main class="content-body" id="questionsContainer">
+        <!-- Populated dynamically by app.js -->
+      </main>
+
+      <!-- Flashcard Mode Container -->
+      <main class="content-body" id="flashcardContainer" style="display: none;">
+        <!-- Populated dynamically by app.js -->
+      </main>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div id="toastContainer"></div>
+
+  <!-- Scripts -->
+  <script src="quiz_data.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
