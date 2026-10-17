@@ -123,6 +123,10 @@
   const themeIconEl = document.getElementById('themeIcon');
   const sidebarEl = document.getElementById('sidebar');
   const sidebarToggleBtn = document.getElementById('sidebarToggleBtn');
+  const sidebarCloseBtn = document.getElementById('sidebarCloseBtn');
+  const sidebarOverlay = document.getElementById('sidebarOverlay');
+  const backToTopBtn = document.getElementById('backToTopBtn');
+  const themeColorMeta = document.getElementById('themeColorMeta');
   const resetCurrentChapterBtn = document.getElementById('resetCurrentChapterBtn');
   const resetAllBtn = document.getElementById('resetAllBtn');
   const filterStarredBtn = document.getElementById('filterStarredBtn');
@@ -131,10 +135,30 @@
   const countAllEl = document.getElementById('countAll');
   const partFilterButtons = document.querySelectorAll('[data-part]');
 
-  // Set initial theme
+  // Set initial theme & sync browser status bar
+  function syncThemeColor() {
+    if (themeColorMeta) {
+      themeColorMeta.setAttribute('content', isDarkMode ? '#0A0E1A' : '#F3F4F6');
+    }
+  }
+
+  // Mobile Sidebar Drawer Controls
+  function openSidebar() {
+    sidebarEl.classList.add('open');
+    if (sidebarOverlay) sidebarOverlay.classList.add('active');
+    document.body.classList.add('sidebar-open');
+  }
+
+  function closeSidebar() {
+    sidebarEl.classList.remove('open');
+    if (sidebarOverlay) sidebarOverlay.classList.remove('active');
+    document.body.classList.remove('sidebar-open');
+  }
+
   document.documentElement.setAttribute('data-theme', isDarkMode ? 'dark' : 'light');
   themeIconEl.textContent = isDarkMode ? '🌙' : '☀️';
   soundIconEl.textContent = soundEnabled ? '🔊' : '🔇';
+  syncThemeColor();
 
   // =========================================================================
   // Markdown & Text Safe Formatter
@@ -306,7 +330,7 @@
     updateSidebarAndHeaders();
 
     // Close mobile sidebar if open
-    sidebarEl.classList.remove('open');
+    closeSidebar();
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
@@ -817,12 +841,25 @@
     document.documentElement.setAttribute('data-theme', isDarkMode ? 'dark' : 'light');
     localStorage.setItem('makequiz_theme', isDarkMode ? 'dark' : 'light');
     themeIconEl.textContent = isDarkMode ? '🌙' : '☀️';
+    syncThemeColor();
   });
 
-  // Sidebar Mobile Toggle
+  // Sidebar Mobile Toggle & Overlay
   sidebarToggleBtn.addEventListener('click', () => {
-    sidebarEl.classList.toggle('open');
+    if (sidebarEl.classList.contains('open')) {
+      closeSidebar();
+    } else {
+      openSidebar();
+    }
   });
+
+  if (sidebarCloseBtn) {
+    sidebarCloseBtn.addEventListener('click', closeSidebar);
+  }
+
+  if (sidebarOverlay) {
+    sidebarOverlay.addEventListener('click', closeSidebar);
+  }
 
   // Part Filter Buttons
   partFilterButtons.forEach((btn) => {
@@ -1070,7 +1107,7 @@
               ${frontBodyHtml}
             </div>
             <div class="fc-card-footer-hint">
-              <span>💡 Bấm vào thẻ hoặc nhấn <strong>Phím Cách (Space)</strong> để lật xem đáp án & căn cứ</span>
+              <span>💡 Chạm thẻ hoặc nhấn <strong>Space</strong> để lật | Vuốt 👈 👉 để chuyển thẻ</span>
             </div>
           </div>
 
@@ -1084,7 +1121,7 @@
               ${backBodyHtml}
             </div>
             <div class="fc-card-footer-hint">
-              <span>🔄 Bấm vào thẻ để lật lại mặt trước | Đánh giá mức độ nhớ bên dưới</span>
+              <span>🔄 Chạm thẻ để lật lại | Đánh giá mức độ nhớ bên dưới</span>
             </div>
           </div>
         </div>
@@ -1314,6 +1351,55 @@
       showToast('Đã đặt lại toàn bộ tiến độ học tập!');
     }
   });
+
+  // =========================================================================
+  // Mobile Enhancements: Touch Gestures & Floating Actions
+  // =========================================================================
+
+  // Floating Back to Top Button
+  if (backToTopBtn) {
+    window.addEventListener('scroll', () => {
+      if (window.scrollY > 280) {
+        backToTopBtn.classList.add('visible');
+      } else {
+        backToTopBtn.classList.remove('visible');
+      }
+    }, { passive: true });
+
+    backToTopBtn.addEventListener('click', () => {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+  }
+
+  // Touch Swipe navigation for Flashcards on Mobile devices
+  let touchStartX = 0;
+  let touchStartY = 0;
+  let touchEndX = 0;
+  let touchEndY = 0;
+
+  flashcardContainer.addEventListener('touchstart', (e) => {
+    if (e.touches && e.touches.length === 1) {
+      touchStartX = e.touches[0].clientX;
+      touchStartY = e.touches[0].clientY;
+    }
+  }, { passive: true });
+
+  flashcardContainer.addEventListener('touchend', (e) => {
+    if (e.changedTouches && e.changedTouches.length === 1) {
+      touchEndX = e.changedTouches[0].clientX;
+      touchEndY = e.changedTouches[0].clientY;
+      const deltaX = touchEndX - touchStartX;
+      const deltaY = touchEndY - touchStartY;
+      // Chỉ nhận diện cử chỉ vuốt ngang khi khoảng cách >= 45px và góc ngang rõ rệt
+      if (Math.abs(deltaX) > 45 && Math.abs(deltaX) > Math.abs(deltaY) * 1.4) {
+        if (deltaX < 0) {
+          nextFlashcard();
+        } else {
+          prevFlashcard();
+        }
+      }
+    }
+  }, { passive: true });
 
   // =========================================================================
   // Initialize Application

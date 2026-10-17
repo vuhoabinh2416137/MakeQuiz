@@ -105,6 +105,8 @@
 html {
   font-size: 16px;
   scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 body {
@@ -112,9 +114,16 @@ body {
   background-color: var(--bg-primary);
   color: var(--text-primary);
   min-height: 100vh;
+  min-height: -webkit-fill-available;
   line-height: 1.6;
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+button, a, input, select, textarea, .option-item, .tf-btn, .filter-btn, .view-mode-tab {
+  touch-action: manipulation;
 }
 
 /* App Layout Grid */
@@ -140,6 +149,7 @@ body {
   z-index: 40;
   transition: var(--transition);
   backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
 .sidebar-header {
@@ -148,6 +158,49 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
+}
+
+.sidebar-close-btn {
+  display: none;
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+  transition: var(--transition);
+  flex-shrink: 0;
+}
+
+.sidebar-close-btn:hover {
+  background: var(--bg-card-hover);
+  color: var(--text-primary);
+  border-color: var(--border-focus);
+}
+
+.sidebar-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 38;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.sidebar-overlay.active {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+body.sidebar-open {
+  overflow: hidden !important;
 }
 
 .brand {
@@ -1129,73 +1182,52 @@ code:not(pre code) {
   }
 }
 
-/* ==========================================================================
-   Responsive Adaptations
-   ========================================================================== */
-@media (max-width: 992px) {
-  .sidebar {
-    transform: translateX(-100%);
-    width: 290px;
-  }
-
-  .sidebar.open {
-    transform: translateX(0);
-    box-shadow: var(--shadow-lg);
-  }
-
-  .main-wrapper {
-    margin-left: 0;
-  }
-
-  .sidebar-toggle-btn {
-    display: block;
-  }
-
-  .active-chapter-indicator .title {
-    max-width: 280px;
-  }
+/* View Mode Bar Container */
+.view-mode-bar {
+  padding: 16px 32px 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
 }
 
-@media (max-width: 640px) {
-  .app-header {
-    padding: 0 16px;
-  }
+/* Floating Back to Top Button */
+.back-to-top-btn {
+  position: fixed;
+  bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+  right: 20px;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-full);
+  background: linear-gradient(135deg, var(--accent-primary), #8B5CF6);
+  color: #FFF;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 4px 18px rgba(99, 102, 241, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 25;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(12px) scale(0.9);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
 
-  .toolbar-container {
-    padding: 16px 16px 8px;
-  }
+.back-to-top-btn.visible {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0) scale(1);
+}
 
-  .content-body {
-    padding: 12px 16px 64px;
-  }
+.back-to-top-btn:hover {
+  transform: translateY(-2px) scale(1.05);
+  box-shadow: 0 8px 24px rgba(99, 102, 241, 0.6);
+}
 
-  .question-card {
-    padding: 16px;
-  }
-
-  .stat-chip {
-    padding: 4px 10px;
-    font-size: 0.75rem;
-  }
-
-  .sa-input-group {
-    flex-direction: column;
-  }
-
-  .sa-submit-btn {
-    width: 100%;
-    justify-content: center;
-  }
-
-  .tf-item-main {
-    flex-direction: column;
-    gap: 12px;
-  }
-
-  .tf-actions {
-    width: 100%;
-    justify-content: flex-end;
-  }
+.back-to-top-btn:active {
+  transform: scale(0.92);
 }
 
 /* ==========================================================================
@@ -1599,30 +1631,478 @@ code:not(pre code) {
   font-weight: 600;
 }
 
+/* ==========================================================================
+   Comprehensive Mobile & Tablet Responsive System
+   ========================================================================== */
+
+/* Tablet & Mobile Layout Shell (<= 992px) */
+@media (max-width: 992px) {
+  .sidebar {
+    transform: translateX(-100%);
+    width: 300px;
+    max-width: 85vw;
+    box-shadow: none;
+    z-index: 50;
+  }
+
+  .sidebar.open {
+    transform: translateX(0);
+    box-shadow: 0 0 60px rgba(0, 0, 0, 0.75);
+  }
+
+  .sidebar-close-btn {
+    display: flex;
+  }
+
+  .main-wrapper {
+    margin-left: 0;
+    width: 100%;
+  }
+
+  .sidebar-toggle-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .active-chapter-indicator .title {
+    max-width: 300px;
+  }
+}
+
+/* Medium & Small Phones (<= 768px) */
 @media (max-width: 768px) {
-  .flashcard-status-bar {
-    flex-direction: column;
-    align-items: flex-start;
+  :root {
+    --header-height: 60px;
   }
-  .flashcard-face {
-    padding: 22px 20px;
+
+  .app-header {
+    height: var(--header-height);
+    padding: 0 14px;
+    gap: 8px;
   }
-  .fc-rating-buttons {
-    flex-direction: column;
+
+  .header-left {
+    gap: 10px;
+    min-width: 0;
+    flex: 1;
+  }
+
+  .sidebar-toggle-btn {
+    padding: 6px;
+    font-size: 1.2rem;
+    color: var(--text-primary);
+  }
+
+  .active-chapter-indicator {
+    min-width: 0;
+  }
+
+  .active-chapter-indicator .badge {
+    font-size: 0.68rem;
+  }
+
+  .active-chapter-indicator .title {
+    font-size: 0.92rem;
+    max-width: 180px;
+  }
+
+  .header-right {
+    gap: 6px;
+    flex-shrink: 0;
+  }
+
+  .stat-chip {
+    padding: 4px 8px;
+    font-size: 0.76rem;
+    gap: 4px;
+  }
+
+  .header-btn {
+    padding: 6px 8px;
+    font-size: 0.8rem;
+    min-width: 34px;
+    height: 34px;
+  }
+
+  /* View Mode Tabs */
+  .view-mode-bar {
+    padding: 12px 14px 0;
+  }
+
+  .view-mode-tabs {
     width: 100%;
+    display: flex;
   }
-  .fc-rate-btn {
+
+  .view-mode-tab {
+    flex: 1;
+    justify-content: center;
+    padding: 8px 10px;
+    font-size: 0.84rem;
+  }
+
+  /* Toolbar Filters */
+  .toolbar-container {
+    padding: 10px 14px 4px;
+    gap: 8px;
+  }
+
+  .filter-group-parts {
     width: 100%;
-    max-width: 100%;
+    display: flex;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding-bottom: 4px;
+    gap: 6px;
   }
-  .fc-nav-row {
+
+  .filter-group-parts::-webkit-scrollbar {
+    display: none;
+  }
+
+  .filter-group-parts .filter-btn {
+    flex-shrink: 0;
+    white-space: nowrap;
+    padding: 6px 12px;
+    font-size: 0.78rem;
+  }
+
+  .filter-group-actions {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+  }
+
+  .filter-group-actions .filter-btn {
+    padding: 5px 10px;
+    font-size: 0.78rem;
+  }
+
+  .action-link-btn {
+    font-size: 0.78rem;
+    margin-left: auto;
+  }
+
+  /* Practice Questions List */
+  .content-body {
+    padding: 10px 14px 60px;
+  }
+
+  .section-banner {
+    margin: 16px 0 12px;
+    padding: 10px 14px;
+  }
+
+  .section-banner h2 {
+    font-size: 0.95rem;
+  }
+
+  .section-banner p {
+    font-size: 0.75rem;
+  }
+
+  .question-card {
+    padding: 16px 14px;
+    margin-bottom: 16px;
+    border-radius: var(--radius-md);
+  }
+
+  .question-stem {
+    font-size: 0.96rem;
+    line-height: 1.55;
+    margin-bottom: 14px;
+  }
+
+  pre code {
+    padding: 10px 12px;
+    font-size: 0.8rem;
+    border-radius: var(--radius-sm);
+    margin: 8px 0 12px;
+  }
+
+  /* Part I Options */
+  .options-list {
+    gap: 8px;
+  }
+
+  .option-item {
+    padding: 11px 12px;
+    gap: 10px;
+    min-height: 48px;
+    border-radius: var(--radius-sm);
+  }
+
+  .option-item:active:not(.disabled) {
+    transform: scale(0.985);
+  }
+
+  .option-key {
+    width: 26px;
+    height: 26px;
+    font-size: 0.8rem;
+  }
+
+  .option-text {
+    font-size: 0.9rem;
+    line-height: 1.45;
+  }
+
+  /* Part II True/False */
+  .tf-context-box {
+    padding: 10px 12px;
+    font-size: 0.88rem;
+    margin-bottom: 12px;
+  }
+
+  .tf-statements-list {
+    gap: 10px;
+  }
+
+  .tf-item-row {
+    padding: 12px;
+    gap: 10px;
+  }
+
+  .tf-item-main {
     flex-direction: column;
     gap: 10px;
   }
+
+  .tf-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    width: 100%;
+    gap: 8px;
+  }
+
+  .tf-btn {
+    width: 100%;
+    justify-content: center;
+    padding: 10px 8px;
+    font-size: 0.84rem;
+  }
+
+  /* Part III Short Answer */
+  .sa-input-group {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .sa-text-input {
+    font-size: 16px; /* Prevents iOS Safari auto-zoom */
+    padding: 11px 14px;
+    width: 100%;
+  }
+
+  .sa-submit-btn {
+    width: 100%;
+    justify-content: center;
+    padding: 12px;
+  }
+
+  /* Explanations & Citations */
+  .explanation-card {
+    padding: 14px 12px;
+    margin-top: 14px;
+  }
+
+  .feedback-status-banner {
+    font-size: 0.95rem;
+    margin-bottom: 10px;
+  }
+
+  .citation-box, .trap-box {
+    font-size: 0.84rem;
+    padding: 8px 10px;
+  }
+
+  /* Flashcard View Mode */
+  .flashcard-container {
+    padding: 10px 14px 60px !important;
+  }
+
+  .flashcard-status-bar {
+    padding: 10px 12px;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  .fc-counter-badge {
+    font-size: 0.82rem;
+    padding: 4px 10px;
+  }
+
+  .flashcard-perspective {
+    min-height: 380px;
+  }
+
+  .flashcard-inner {
+    min-height: 380px;
+  }
+
+  .flashcard-face {
+    padding: 20px 16px;
+    border-radius: var(--radius-md);
+  }
+
+  .fc-card-top {
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+  }
+
+  .fc-prompt-text {
+    font-size: 1.02rem;
+    line-height: 1.5;
+    margin-bottom: 12px;
+  }
+
+  .fc-answer-badge {
+    font-size: 1rem;
+    padding: 8px 14px;
+    margin-bottom: 12px;
+  }
+
+  .fc-card-footer-hint {
+    font-size: 0.78rem;
+    text-align: center;
+    line-height: 1.4;
+    padding-top: 10px;
+  }
+
+  .flashcard-controls-panel {
+    margin-top: 14px;
+    gap: 10px;
+  }
+
+  .fc-rating-buttons {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+    width: 100%;
+  }
+
+  .fc-rate-btn {
+    padding: 9px 4px;
+    font-size: 0.78rem;
+    gap: 4px;
+    flex-direction: column;
+    text-align: center;
+    justify-content: center;
+    width: 100%;
+  }
+
+  .fc-rate-btn span {
+    font-size: 1rem;
+  }
+
+  .fc-nav-row {
+    display: grid;
+    grid-template-columns: 1fr 1.6fr 1fr;
+    gap: 6px;
+    width: 100%;
+  }
+
+  .fc-nav-btn {
+    padding: 11px 6px;
+    font-size: 0.8rem;
+    justify-content: center;
+    gap: 4px;
+    width: 100%;
+  }
+
   .fc-flip-btn-big {
     max-width: 100%;
     width: 100%;
-    order: -1;
+    padding: 11px 8px;
+    font-size: 0.86rem;
+    justify-content: center;
+    gap: 6px;
+  }
+
+  .fc-mastery-strip {
+    padding: 8px 10px;
+    gap: 6px 12px;
+    font-size: 0.75rem;
+    justify-content: space-around;
+  }
+
+  /* Toasts */
+  .toast {
+    left: 14px;
+    right: 14px;
+    bottom: 20px;
+    font-size: 0.84rem;
+    justify-content: center;
+    padding: 10px 16px;
+  }
+}
+
+/* Extra Small Phones (<= 480px) */
+@media (max-width: 480px) {
+  .app-header {
+    padding: 0 10px;
+  }
+
+  .active-chapter-indicator .badge {
+    font-size: 0.64rem;
+  }
+
+  .active-chapter-indicator .title {
+    font-size: 0.85rem;
+    max-width: 120px;
+  }
+
+  .stat-chip.progress-chip {
+    display: none;
+  }
+
+  .stat-chip {
+    padding: 3px 6px;
+    font-size: 0.72rem;
+  }
+
+  .header-btn {
+    padding: 4px 6px;
+    min-width: 30px;
+    height: 30px;
+    font-size: 0.75rem;
+  }
+
+  .card-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .card-meta {
+    width: 100%;
+  }
+
+  .card-actions-top {
+    align-self: flex-end;
+    margin-top: -30px;
+  }
+
+  .fc-nav-btn {
+    font-size: 0.74rem;
+    padding: 10px 4px;
+  }
+
+  .fc-flip-btn-big {
+    font-size: 0.8rem;
+    padding: 10px 4px;
+  }
+
+  .back-to-top-btn {
+    right: 14px;
+    bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+    width: 40px;
+    height: 40px;
   }
 }
 
