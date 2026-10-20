@@ -6,23 +6,27 @@ import json
 
 sys.stdout.reconfigure(encoding='utf-8')
 
-TEST_DIR = r'c:\Users\mrore\MakeQuiz\Spring_boot\test'
-OUTPUT_JSON = r'c:\Users\mrore\MakeQuiz\quiz_data.json'
-OUTPUT_JS = r'c:\Users\mrore\MakeQuiz\quiz_data.js'
+BASE_DIR = r'c:\Users\mrore\MakeQuiz'
+OUTPUT_JSON = os.path.join(BASE_DIR, 'quiz_data.json')
+OUTPUT_JS = os.path.join(BASE_DIR, 'quiz_data.js')
 
-files = sorted(glob.glob(os.path.join(TEST_DIR, 'Chuong_*.md')))
+SUBJECTS = [
+    {
+        'id': 'attt',
+        'name': 'An toàn thông tin (HUST)',
+        'badge': '🛡️ ATTT',
+        'dir': os.path.join(BASE_DIR, 'An_toan_thong_tin', 'test')
+    },
+    {
+        'id': 'spring_boot',
+        'name': 'Spring Boot',
+        'badge': '🍃 Spring Boot',
+        'dir': os.path.join(BASE_DIR, 'Spring_boot', 'test')
+    }
+]
 
 def extract_accepted_answers(raw_text):
-    """
-    Parses strings like:
-    `Spring Core`
-    `IoC` (hoặc `Inversion of Control`, `Đảo ngược điều khiển`)
-    Constructor Injection (Tiêm qua hàm khởi tạo)
-    Tên khung nhìn (hoặc `View name`, `Logical view name`)
-    `Regression Testing` (hoặc `Kiểm thử hồi quy`)
-    """
     answers = []
-    # 1. Look for backtick quoted tokens
     codes = re.findall(r'`([^`]+)`', raw_text)
     if codes:
         for c in codes:
@@ -30,10 +34,7 @@ def extract_accepted_answers(raw_text):
             if c and c not in answers:
                 answers.append(c)
     
-    # 2. Look for text inside brackets or outside
-    # Remove outer backticks
     clean = raw_text.replace('`', '').strip()
-    # If there's (hoặc ...)
     m = re.search(r'^(.*?)\s*\((?:hoặc\s+)?(.*?)\)$', clean)
     if m:
         main_part = m.group(1).strip()
@@ -54,7 +55,6 @@ def parse_chapter(ch_idx, file_path):
     with open(file_path, encoding='utf-8') as f:
         content = f.read()
 
-    # Extract title
     title_m = re.search(r'^#\s+🎯\s*BỘ ĐỀ LUYỆN TẬP TOÀN DIỆN:\s*(.+)$', content, re.MULTILINE)
     if not title_m:
         title_m = re.search(r'^#\s+(.+)$', content, re.MULTILINE)
@@ -65,14 +65,12 @@ def parse_chapter(ch_idx, file_path):
     sec3 = content.split('## PHẦN III: TRẢ LỜI NGẮN')[1].split('## 🔍 BẢNG ĐÁP ÁN VÀ LỜI GIẢI CHI TIẾT')[0]
     sec_ans = content.split('## 🔍 BẢNG ĐÁP ÁN VÀ LỜI GIẢI CHI TIẾT')[1]
 
-    # Quick answer table for MCQ
     mcq_table_rows = re.findall(r'\|\s*(\d+)\s*\|\s*\*\*([A-D])\*\*\s*\|\s*([^\|]+?)\s*\|\s*(\d+)\s*\|\s*\*\*([A-D])\*\*\s*\|\s*([^\|]+?)\s*\|', sec_ans)
     mcq_ans_map = {}
-    for r in table_rows if (table_rows := mcq_table_rows) else []:
+    for r in mcq_table_rows:
         mcq_ans_map[int(r[0])] = {'answer': r[1], 'level': r[2].strip()}
         mcq_ans_map[int(r[3])] = {'answer': r[4], 'level': r[5].strip()}
 
-    # Detailed solutions
     ans_parts = re.split(r'####\s+', sec_ans)
     p1_exp_text = ''
     p2_exp_text = ''
@@ -82,7 +80,6 @@ def parse_chapter(ch_idx, file_path):
         elif 'PHẦN II:' in p: p2_exp_text = p
         elif 'PHẦN III:' in p: p3_exp_text = p
 
-    # P1 explanations
     p1_exp = {}
     p1_exp_blocks = re.split(r'-\s+\*\*Câu\s+(\d+):\s*Đáp\s*án\s*([A-D])\*\*', p1_exp_text)
     for i in range(1, len(p1_exp_blocks), 3):
@@ -91,7 +88,6 @@ def parse_chapter(ch_idx, file_path):
         body = p1_exp_blocks[i+2].strip()
         p1_exp[qnum] = {'answer': ans, 'explanation': body}
 
-    # P2 True/False quick answers
     tf_ans_map = {}
     tf_quick_matches = re.findall(r'-\s+\*\*Câu\s+(\d+):\*\*\s+a:\s*\*\*([^\*]+)\*\*\s*\|\s*b:\s*\*\*([^\*]+)\*\*\s*\|\s*c:\s*\*\*([^\*]+)\*\*\s*\|\s*d:\s*\*\*([^\*]+)\*\*', sec_ans, re.IGNORECASE)
     for m in tf_quick_matches:
@@ -103,7 +99,6 @@ def parse_chapter(ch_idx, file_path):
             'd': 'ĐÚNG' in m[4].upper()
         }
 
-    # P2 explanations
     p2_exp_map = {}
     p2_exp_blocks = re.split(r'-\s+\*\*Câu\s+(\d+):\*\*', p2_exp_text)
     for i in range(1, len(p2_exp_blocks), 2):
@@ -119,7 +114,6 @@ def parse_chapter(ch_idx, file_path):
                 }
         p2_exp_map[qnum] = exp_sub
 
-    # P3 Short Answer quick answers
     p3_ans_map = {}
     p3_ans_lines = re.findall(r'-\s+\*\*Câu\s+(\d+):\*\*\s+(.*)', sec_ans)
     for m in p3_ans_lines:
@@ -131,7 +125,6 @@ def parse_chapter(ch_idx, file_path):
                 'accepted': extract_accepted_answers(raw)
             }
 
-    # P3 explanations
     p3_exp_map = {}
     p3_exp_lines = re.findall(r'-\s+\*\*Câu\s+(\d+):\*\*\s+(.*)', p3_exp_text)
     for m in p3_exp_lines:
@@ -148,26 +141,16 @@ def parse_chapter(ch_idx, file_path):
         body = q_splits[i+2].strip()
 
         opt_matches = list(re.finditer(r'^([A-D])\.\s+(.*)$', body, re.MULTILINE))
-        stem = body[:opt_matches[0].start()].strip() if opt_matches else body
-        options = []
-        for om in opt_matches:
-            options.append({
-                'key': om.group(1),
-                'text': om.group(2).strip()
-            })
+        if len(opt_matches) >= 4:
+            stem = body[:opt_matches[0].start()].strip()
+            options = [{'key': m.group(1), 'text': m.group(2).strip()} for m in opt_matches[:4]]
+        else:
+            stem = body
+            options = []
 
-        c_ans = mcq_ans_map.get(qnum, {}).get('answer') or p1_exp.get(qnum, {}).get('answer', 'A')
-        exp = p1_exp.get(qnum, {}).get('explanation', '')
-
-        # Parse citation and trap rationale if available
-        citation = ''
-        trap = ''
-        c_m = re.search(r'-\s*\*Căn cứ tài liệu\*:\s*(.+)', exp)
-        if c_m:
-            citation = c_m.group(1).strip()
-        t_m = re.search(r'-\s*\*Phân tích bẫy\*:\s*(.+)', exp)
-        if t_m:
-            trap = t_m.group(1).strip()
+        ans_info = p1_exp.get(qnum, {})
+        correct_opt = ans_info.get('answer') or mcq_ans_map.get(qnum, {}).get('answer', 'A')
+        exp = ans_info.get('explanation', '')
 
         questions.append({
             'num': qnum,
@@ -177,42 +160,42 @@ def parse_chapter(ch_idx, file_path):
             'level': level,
             'stem': stem,
             'options': options,
-            'correctAnswer': c_ans,
-            'explanation': exp,
-            'citation': citation,
-            'trap': trap
+            'correctAnswer': correct_opt,
+            'explanation': exp
         })
 
-    # 2. Part II: True/False (Questions 21 to 25)
-    p2_splits = re.split(r'\*\*Câu\s+(\d+):\*\*', sec2)
-    for i in range(1, len(p2_splits), 2):
-        qnum = int(p2_splits[i])
-        body = p2_splits[i+1].strip()
-        lines = body.split('\n')
-        context = lines[0].strip()
+    # 2. Part II: True / False (Questions 21 to 25)
+    tf_splits = re.split(r'\*\*Câu\s+(\d+):\*\*', sec2)
+    for i in range(1, len(tf_splits), 2):
+        qnum = int(tf_splits[i])
+        body = tf_splits[i+1].strip()
+
+        context_m = re.search(r'^(.*?)(?=-\s*\*\*a\))', body, re.DOTALL)
+        context = context_m.group(1).strip() if context_m else ''
+
         sub_items = []
-        for line in lines[1:]:
-            im = re.search(r'-\s+\*\*([a-d])\)\*\*\s+(?:\[(.*?)\])?\s*(.*)$', line)
-            if im:
-                s_key = im.group(1)
-                s_level = im.group(2).strip() if im.group(2) else 'Thông hiểu'
-                s_text = im.group(3).strip()
-                s_ans = tf_ans_map.get(qnum, {}).get(s_key, True)
-                s_exp = p2_exp_map.get(qnum, {}).get(s_key, {}).get('note', '')
-                sub_items.append({
-                    'key': s_key,
-                    'level': s_level,
-                    'text': s_text,
-                    'correctAnswer': s_ans,
-                    'explanation': s_exp
-                })
+        item_matches = list(re.finditer(r'-\s*\*\*([a-d])\)\*\*\s*(?:\[(.*?)\])?\s*(.*?)(?=(?:-\s*\*\*|$))', body, re.DOTALL))
+        for im in item_matches:
+            opt_key = im.group(1)
+            opt_lvl = im.group(2).strip() if im.group(2) else 'Thông hiểu'
+            opt_text = im.group(3).strip()
+            
+            c_val = tf_ans_map.get(qnum, {}).get(opt_key, True)
+            c_exp = p2_exp_map.get(qnum, {}).get(opt_key, {}).get('note', '')
+
+            sub_items.append({
+                'key': opt_key,
+                'level': opt_lvl,
+                'text': opt_text,
+                'correct': c_val,
+                'note': c_exp
+            })
 
         questions.append({
             'num': qnum,
             'part': 2,
             'partName': 'Trắc nghiệm Đúng / Sai',
             'type': 'true_false',
-            'level': 'Đúng / Sai tổng hợp',
             'context': context,
             'items': sub_items
         })
@@ -253,23 +236,37 @@ def parse_chapter(ch_idx, file_path):
         'questions': questions
     }
 
-print(f"Parsing {len(files)} chapters...")
 all_chapters = []
 total_q = 0
-for idx, f in enumerate(files, 1):
-    ch_data = parse_chapter(idx, f)
-    all_chapters.append(ch_data)
-    total_q += len(ch_data['questions'])
-    print(f"[{idx}/15] {ch_data['filename']} -> {len(ch_data['questions'])} questions parsed.")
+global_id = 1
 
-print(f"\nTotal parsed: {len(all_chapters)} chapters, {total_q} questions.")
+for subj in SUBJECTS:
+    if not os.path.exists(subj['dir']):
+        continue
+    files = sorted(glob.glob(os.path.join(subj['dir'], 'Chuong_*.md')))
+    print(f"\nScanning {subj['name']} ({len(files)} files)...")
+    for f in files:
+        m = re.search(r'Chuong_(\d+)', os.path.basename(f))
+        ch_num = int(m.group(1)) if m else global_id
 
-# Save to JSON
+        ch_data = parse_chapter(global_id, f)
+        ch_data['subjectId'] = subj['id']
+        ch_data['subjectName'] = subj['name']
+        ch_data['subjectBadge'] = subj['badge']
+        ch_data['chapterNum'] = ch_num
+        all_chapters.append(ch_data)
+        total_q += len(ch_data['questions'])
+        print(f"[{global_id}] [{subj['badge']}] {ch_data['filename']} -> {len(ch_data['questions'])} questions parsed.")
+        global_id += 1
+
+print(f"\n==========================================")
+print(f"Total parsed: {len(all_chapters)} chapters, {total_q} questions across subjects.")
+print(f"==========================================")
+
 with open(OUTPUT_JSON, 'w', encoding='utf-8') as f:
     json.dump(all_chapters, f, ensure_ascii=False, indent=2)
 print(f"Saved to {OUTPUT_JSON}")
 
-# Save to JS for zero-cors direct static execution
 with open(OUTPUT_JS, 'w', encoding='utf-8') as f:
     f.write('window.QUIZ_DATA = ' + json.dumps(all_chapters, ensure_ascii=False) + ';')
 print(f"Saved to {OUTPUT_JS}")

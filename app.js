@@ -11,6 +11,7 @@
   // =========================================================================
   const chapters = window.QUIZ_DATA || [];
   let currentChapterId = 1;
+  let currentSubjectId = 'attt'; // Default to ATTT
   let activePartFilter = 'all'; // 'all', '1', '2', '3'
   let activeSpecialFilter = null; // null, 'starred', 'incorrect'
   let soundEnabled = localStorage.getItem('makequiz_sound') !== 'false';
@@ -187,6 +188,35 @@
       return `<code>${escapeHtml(code)}</code>`;
     });
 
+    // Math symbols & LaTeX cleaner: format $...$ into clean typography without raw dollar signs
+    out = out.replace(/\$([^\$]+)\$/g, function (_, math) {
+      let m = math
+        .replace(/\\times/g, '×')
+        .replace(/\\cdot/g, '×')
+        .replace(/\\equiv/g, '≡')
+        .replace(/\\pmod\{([^}]+)\}/g, '(mod $1)')
+        .replace(/\\pmod\s+([a-zA-Z0-9]+)/g, '(mod $1)')
+        .replace(/\\phi/g, 'φ')
+        .replace(/\\omega/g, 'ω')
+        .replace(/\\sum/g, '∑')
+        .replace(/\\le/g, '≤')
+        .replace(/\\ge/g, '≥')
+        .replace(/\\ne/g, '≠')
+        .replace(/\\mathcal\{O\}/g, 'O')
+        .replace(/\\frac\{([^}]+)\}\{([^}]+)\}/g, '$1/$2')
+        .replace(/\^2\b/g, '²')
+        .replace(/\^3\b/g, '³')
+        .replace(/\^n\b/g, 'ⁿ')
+        .replace(/\^k\b/g, 'ᵏ')
+        .replace(/\^\{-1\}/g, '⁻¹')
+        .replace(/\^-1/g, '⁻¹')
+        .replace(/_1\b/g, '₁')
+        .replace(/_2\b/g, '₂')
+        .replace(/_i\b/g, 'ᵢ')
+        .replace(/_n\b/g, 'ₙ');
+      return `<span class="math-expr" style="font-family:'Plus Jakarta Sans', sans-serif; font-weight:600;">${m}</span>`;
+    });
+
     // Bold **text**
     out = out.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
 
@@ -214,6 +244,80 @@
   // =========================================================================
   // Chapter & Stats Computations
   // =========================================================================
+  
+  // =========================================================================
+  // Subject & Course Management
+  // =========================================================================
+  function getSubjects() {
+    const map = new Map();
+    chapters.forEach((ch) => {
+      const sId = ch.subjectId || (ch.filename && ch.filename.includes('Spring') ? 'spring_boot' : 'attt');
+      if (!map.has(sId)) {
+        const isAttt = sId === 'attt' || (ch.subjectName && ch.subjectName.toLowerCase().includes('toàn'));
+        map.set(sId, {
+          id: sId,
+          name: ch.subjectName || (isAttt ? 'An toàn thông tin (HUST)' : 'Spring Boot'),
+          badge: ch.subjectBadge || (isAttt ? '🛡️ ATTT' : '🍃 Spring Boot'),
+          icon: isAttt ? '🛡️' : '🍃',
+          chapters: []
+        });
+      }
+      map.get(sId).chapters.push(ch);
+    });
+    return Array.from(map.values());
+  }
+
+  function renderSubjectSwitcher() {
+    const container = document.getElementById('subjectSwitcher');
+    if (!container) return;
+    container.innerHTML = '';
+
+    const subjects = getSubjects();
+    if (subjects.length === 0) return;
+
+    subjects.forEach((subj) => {
+      const btn = document.createElement('button');
+      btn.className = `subject-card ${subj.id === currentSubjectId ? 'active' : ''}`;
+      
+      let totalQuestions = 0;
+      let totalAnswered = 0;
+      subj.chapters.forEach((c) => {
+        const s = getChapterStats(c.id);
+        totalQuestions += s.total;
+        totalAnswered += s.answered;
+      });
+
+      btn.innerHTML = `
+        <div class="subject-card-icon">${subj.icon}</div>
+        <div class="subject-card-info">
+          <div class="subject-card-name">${escapeHtml(subj.name)}</div>
+          <div class="subject-card-meta">${subj.chapters.length} chương • ${totalQuestions} câu (${totalAnswered}/${totalQuestions})</div>
+        </div>
+      `;
+
+      btn.onclick = () => selectSubject(subj.id);
+      container.appendChild(btn);
+    });
+  }
+
+  function selectSubject(subjId) {
+    currentSubjectId = subjId;
+    const subjects = getSubjects();
+    const curSubj = subjects.find(s => s.id === subjId);
+    
+    if (curSubj && curSubj.chapters.length > 0) {
+      // If currentChapterId is not in this subject, switch to first chapter
+      const chapterInSubj = curSubj.chapters.find(c => c.id === currentChapterId);
+      if (!chapterInSubj) {
+        selectChapter(curSubj.chapters[0].id);
+      } else {
+        renderSidebarChapters();
+        updateSidebarAndHeaders();
+      }
+    }
+    renderSubjectSwitcher();
+  }
+
   function getChapterStats(chId) {
     const ch = chapters.find((c) => c.id === chId);
     if (!ch) return { total: 0, answered: 0, correct: 0, incorrect: 0, percent: 0 };
@@ -254,10 +358,21 @@
   }
 
   function updateSidebarAndHeaders() {
-    // 1. Overall stats
-    const ov = getOverallStats();
-    overallProgressTextEl.textContent = `${ov.totalAnswered}/${ov.totalQuestions}`;
-    overallPercentTextEl.textContent = `${ov.percent}%`;
+    // 1. Subject stats
+    const subjects = getSubjects();
+    const curSubj = subjects.find(s => s.id === currentSubjectId);
+    let subjTotal = 0;
+    let subjAnswered = 0;
+    if (curSubj) {
+      curSubj.chapters.forEach(c => {
+        const s = getChapterStats(c.id);
+        subjTotal += s.total;
+        subjAnswered += s.answered;
+      });
+    }
+    const subjPercent = subjTotal > 0 ? Math.round((subjAnswered / subjTotal) * 100) : 0;
+    overallProgressTextEl.textContent = `${subjAnswered}/${subjTotal}`;
+    overallPercentTextEl.textContent = `${subjPercent}%`;
 
     // 2. Current Chapter stats
     const curStats = getChapterStats(currentChapterId);
@@ -279,7 +394,23 @@
     const query = chapterSearchInput.value.toLowerCase().trim();
     chapterListEl.innerHTML = '';
 
-    chapters.forEach((ch) => {
+    // Filter chapters by currentSubjectId
+    const subjectChapters = chapters.filter((ch) => {
+      const sId = ch.subjectId || (ch.filename && ch.filename.includes('Spring') ? 'spring_boot' : 'attt');
+      return sId === currentSubjectId;
+    });
+
+    const chapterListTitleEl = document.getElementById('chapterListTitle');
+    const chapterListCountEl = document.getElementById('chapterListCount');
+    if (chapterListTitleEl) {
+      const curSubj = getSubjects().find(s => s.id === currentSubjectId);
+      chapterListTitleEl.textContent = curSubj ? curSubj.name.toUpperCase() : 'DANH SÁCH CHƯƠNG';
+    }
+    if (chapterListCountEl) {
+      chapterListCountEl.textContent = `${subjectChapters.length} chương`;
+    }
+
+    subjectChapters.forEach((ch) => {
       const stats = getChapterStats(ch.id);
       const matchesSearch =
         ch.title.toLowerCase().includes(query) ||
@@ -297,7 +428,7 @@
 
       item.innerHTML = `
         <div class="chapter-item-top">
-          <span class="chapter-number">Chương ${ch.id}</span>
+          <span class="chapter-number">${ch.subjectBadge ? ch.subjectBadge + ' • Chương ' + (ch.chapterNum || ch.id) : 'Chương ' + ch.id}</span>
           <span class="chapter-score-pill">${stats.answered}/${stats.total}</span>
         </div>
         <div class="chapter-title">${escapeHtml(cleanTitle)}</div>
@@ -317,7 +448,11 @@
 
     const ch = chapters.find((c) => c.id === chId);
     if (ch) {
-      activeChapterBadgeEl.textContent = `Chương ${ch.id}`;
+      const chSubjId = ch.subjectId || (ch.filename && ch.filename.includes('Spring') ? 'spring_boot' : 'attt');
+      if (chSubjId && chSubjId !== currentSubjectId) {
+        currentSubjectId = chSubjId;
+      }
+      activeChapterBadgeEl.textContent = ch.subjectBadge ? `${ch.subjectBadge} • Chương ${ch.chapterNum || ch.id}` : `Chương ${ch.id}`;
       let cleanTitle = ch.title
         .replace(/^🎯\s*BỘ ĐỀ LUYỆN TẬP TOÀN DIỆN:\s*/i, '')
         .replace(/^CHƯƠNG\s+\d+\s*-\s*/i, '');
@@ -325,6 +460,7 @@
       countAllEl.textContent = ch.questions.length;
     }
 
+    renderSubjectSwitcher();
     renderSidebarChapters();
     renderQuestions();
     updateSidebarAndHeaders();
@@ -445,7 +581,10 @@
     const isCorrect = state.isCorrect;
 
     let optionsHtml = '<div class="options-list">';
-    q.options.forEach((opt) => {
+    const optList = Array.isArray(q.options) 
+      ? q.options 
+      : Object.entries(q.options || {}).map(([key, text]) => ({ key, text }));
+    optList.forEach((opt) => {
       let optClass = 'option-item';
       if (isAnswered) {
         optClass += ' disabled';
@@ -991,7 +1130,8 @@
     let frontBodyHtml = '';
     if (q.part === 1) {
       // MCQ Front: prompt + options
-      let optList = q.options.map((o) => `
+      const fcOpts = Array.isArray(q.options) ? q.options : Object.entries(q.options || {}).map(([key, text]) => ({ key, text }));
+      let optList = fcOpts.map((o) => `
         <div class="fc-option-item">
           <div class="fc-option-letter">${o.key}</div>
           <div class="fc-option-text">${formatMarkdown(o.text)}</div>
@@ -1026,7 +1166,8 @@
     // Back Content Generation
     let backBodyHtml = '';
     if (q.part === 1) {
-      const correctOpt = q.options.find((o) => o.key === q.correctAnswer);
+      const fcOptsAll = Array.isArray(q.options) ? q.options : Object.entries(q.options || {}).map(([key, text]) => ({ key, text }));
+      const correctOpt = fcOptsAll.find((o) => o.key === q.correctAnswer);
       backBodyHtml = `
         <div class="fc-answer-badge">
           <span>✓ Đáp án đúng:</span> <strong>${q.correctAnswer}</strong>
@@ -1405,6 +1546,7 @@
   // Initialize Application
   // =========================================================================
   if (chapters.length > 0) {
+    renderSubjectSwitcher();
     selectChapter(1);
   } else {
     questionsContainerEl.innerHTML = `
